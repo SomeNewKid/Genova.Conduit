@@ -2,7 +2,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Genova.Common.Attributes;
-using Genova.Conduit.Models;
+using Genova.Conduit.Chats;
 
 namespace Genova.Conduit.Storage;
 
@@ -20,5 +20,5 @@ public sealed class Conversation
     /// <summary>
     /// Gets or sets the messages that comprise the conversation history.
     /// </summary>
-    public IList<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
+    public IList<ChatMessage> Messages { get; set; } = [];
 }

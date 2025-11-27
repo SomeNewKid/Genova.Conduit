@@ -3,7 +3,7 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit.Models;
+namespace Genova.Conduit.Chats;
 
 /// <summary>
 /// Defines a request to a chat-capable model.
@@ -14,7 +14,7 @@ public sealed class ChatRequest
     /// <summary>
     /// Gets or sets the sequence of messages that make up the chat history.
     /// </summary>
-    public IList<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
+    public IList<ChatMessage> Messages { get; set; } = [];
 
     /// <summary>
     /// Gets or sets an optional model identifier to use for this request.

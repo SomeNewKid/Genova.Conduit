@@ -6,39 +6,42 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Genova.Conduit.Models;
+using Genova.Common.Attributes;
 
-namespace Genova.Conduit.Terminal;
+namespace Genova.Conduit.Chats;
 
 /// <summary>
-/// Simple implementation of <see cref="IChatModelClient"/> that calls the
+/// Simple implementation of <see cref="IChatClient"/> that calls the
 /// OpenAI Chat Completions HTTP API.
 /// </summary>
-public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
+[CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
+public sealed class OpenAiChatClient : IChatClient, IDisposable
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _modelId;
-    private bool _disposed;
-
     [SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "Conflicting naming rules")]
     private static readonly JsonSerializerOptions CamelCaseOptions =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+    private readonly HttpClient _httpClient;
+    private readonly string _modelId;
+    private bool _disposed;
+
     /// <summary>
-    /// Creates a new OpenAI chat model client.
+    /// Initializes a new instance of the <see cref="OpenAiChatClient"/> class.
     /// </summary>
     /// <param name="apiKey">The OpenAI API key.</param>
     /// <param name="modelId">The model identifier (e.g. "gpt-4o-mini").</param>
-    public OpenAiChatModelClient(string apiKey, string modelId = "gpt-4o-mini")
+    public OpenAiChatClient(string apiKey, string modelId = "gpt-4o-mini")
     {
         if (string.IsNullOrWhiteSpace(apiKey))
+        {
             throw new ArgumentException("API key must be provided.", nameof(apiKey));
+        }
 
         _modelId = modelId ?? throw new ArgumentNullException(nameof(modelId));
 
         _httpClient = new HttpClient
         {
-            BaseAddress = new Uri("https://api.openai.com/v1/")
+            BaseAddress = new Uri("https://api.openai.com/v1/"),
         };
 
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -48,7 +51,7 @@ public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task<ChatCompletionResult> GenerateAsync(
+    public async Task<ChatResponse> GenerateAsync(
         ChatRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -61,7 +64,7 @@ public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
             Model = modelId,
             Messages = MapMessages(request.Messages),
             MaxTokens = request.MaxTokens,
-            Temperature = request.Temperature
+            Temperature = request.Temperature,
         };
 
         // Use the cached options instance
@@ -89,15 +92,29 @@ public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
             ? new ChatMessage
             {
                 Role = MapRoleBack(firstChoice.Message.Role),
-                Content = firstChoice.Message.Content ?? string.Empty
+                Content = firstChoice.Message.Content ?? string.Empty,
             }
             : null;
 
-        return new ChatCompletionResult
+        return new ChatResponse
         {
             Message = message,
-            ProviderMetadata = completion
+            ProviderMetadata = completion,
         };
+    }
+
+    /// <summary>
+    /// Disposes the HTTP client.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _httpClient.Dispose();
     }
 
     private static List<ChatCompletionMessageDto> MapMessages(IList<ChatMessage> messages)
@@ -109,7 +126,7 @@ public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
             list.Add(new ChatCompletionMessageDto
             {
                 Role = MapRole(message.Role),
-                Content = message.Content
+                Content = message.Content,
             });
         }
 
@@ -135,18 +152,6 @@ public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
             "user" => ChatMessageRole.User,
             _ => ChatMessageRole.Assistant
         };
-
-    /// <summary>
-    /// Disposes the HTTP client.
-    /// </summary>
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _httpClient.Dispose();
-    }
-
-    #region DTOs for OpenAI Chat Completions API
 
     private sealed class ChatCompletionRequestDto
     {
@@ -176,6 +181,4 @@ public sealed class OpenAiChatModelClient : IChatModelClient, IDisposable
     {
         public ChatCompletionMessageDto Message { get; set; } = new();
     }
-
-    #endregion
 }

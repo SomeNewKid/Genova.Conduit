@@ -1,6 +1,8 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace Genova.Conduit.Storage;
 
 /// <summary>
@@ -30,6 +32,10 @@ public interface IFileStore
     /// <returns>
     /// The file content as a byte array if found; otherwise <c>null</c>.
     /// </returns>
+    [SuppressMessage(
+        "StyleCop.CSharp.SpacingRules",
+        "SA1011:Closing square brackets should be spaced correctly",
+        Justification = "Conflicting style rules.")]
     Task<byte[]?> LoadFileAsync(
         string fileId,
         CancellationToken cancellationToken = default);

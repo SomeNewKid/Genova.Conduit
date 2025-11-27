@@ -3,18 +3,18 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit.Models;
+namespace Genova.Conduit.Embeddings;
 
 /// <summary>
 /// Represents the result of an embedding request.
 /// </summary>
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
-public sealed class EmbeddingResult
+public sealed class EmbeddingResponse
 {
     /// <summary>
     /// Gets or sets the embedding vectors, one per input.
     /// </summary>
-    public IList<Embedding> Embeddings { get; set; } = new List<Embedding>();
+    public IList<Embedding> Embeddings { get; set; } = [];
 
     /// <summary>
     /// Gets or sets raw provider-specific data, if any.

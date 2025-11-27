@@ -3,21 +3,16 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit.Models;
+namespace Genova.Conduit.Embeddings;
 
 /// <summary>
-/// Represents a single message in a chat interaction.
+/// Represents a single embedding vector.
 /// </summary>
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
-public sealed class ChatMessage
+public sealed class Embedding
 {
     /// <summary>
-    /// Gets or sets the role of the message.
+    /// Gets or sets the floating-point values that comprise the embedding.
     /// </summary>
-    public ChatMessageRole Role { get; set; }
-
-    /// <summary>
-    /// Gets or sets the textual content of the message.
-    /// </summary>
-    public string Content { get; set; } = string.Empty;
+    public IReadOnlyList<float> Values { get; set; } = Array.Empty<float>();
 }

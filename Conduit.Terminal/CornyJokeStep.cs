@@ -1,7 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
-using Genova.Conduit.Models;
+using Genova.Conduit.Chats;
 
 namespace Genova.Conduit.Terminal;
 
@@ -11,19 +11,19 @@ namespace Genova.Conduit.Terminal;
 /// </summary>
 public sealed class CornyJokeStep : IPipelineStep
 {
-    private readonly IChatModelClient _chatModelClient;
+    private readonly IChatClient _chatModelClient;
     private readonly string _topic;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CornyJokeStep"/> class.
     /// </summary>
     /// <param name="chatModelClient">
-    /// The chat model client to use for generating the joke.
+    /// The chat model client to use to generate the joke. Must not be <c>null</c>.
     /// </param>
     /// <param name="topic">
-    /// The topic to generate a joke about.
+    /// The topic to generate a joke about. Must not be <c>null</c> or empty.
     /// </param>
-    public CornyJokeStep(IChatModelClient chatModelClient, string topic)
+    public CornyJokeStep(IChatClient chatModelClient, string topic)
     {
         _chatModelClient = chatModelClient ?? throw new ArgumentNullException(nameof(chatModelClient));
         _topic = !string.IsNullOrWhiteSpace(topic)
@@ -31,13 +31,14 @@ public sealed class CornyJokeStep : IPipelineStep
             : throw new ArgumentException("Topic must be non-empty.", nameof(topic));
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public async Task ExecuteAsync(PipelineContext context, CancellationToken cancellationToken = default)
     {
-        // Build a simple chat request
-        ChatRequest request = new ()
+        var request = new ChatRequest
         {
-            ModelId = null, // optional; client may have a default
+            ModelId = null,   // use default from client
+            MaxTokens = 128,
+            Temperature = 0.8,
             Messages =
                 {
                     new ChatMessage
@@ -50,16 +51,13 @@ public sealed class CornyJokeStep : IPipelineStep
                         Role = ChatMessageRole.User,
                         Content = $"Please tell me one short, corny joke about: {_topic}"
                     }
-                },
-            MaxTokens = 128,
-            Temperature = 0.8
+                }
         };
 
-        ChatCompletionResult result = await _chatModelClient.GenerateAsync(request, cancellationToken);
+        ChatResponse response = await _chatModelClient.GenerateAsync(request, cancellationToken);
 
-        string joke = result?.Message?.Content ?? string.Empty;
+        string joke = response.Message?.Content ?? string.Empty;
 
-        // Store the joke in the context so the host can read it
         context.SetItem("CornyJoke", joke);
     }
 }

@@ -3,7 +3,7 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit.Models;
+namespace Genova.Conduit.Chats;
 
 /// <summary>
 /// Represents the role of a message in a chat-based interaction.

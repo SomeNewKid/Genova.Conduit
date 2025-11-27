@@ -1,22 +1,18 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using Genova.Conduit.Chats;
+using Genova.Conduit.Pipelines;
+using Genova.Conduit.Steps;
+using Genova.Conduit.Tools;
+
 namespace Genova.Conduit.Terminal;
 
-/// <summary>
-/// The main program class for the Corny Joke demo application.
-/// </summary>
-internal class Program
+internal static class Program
 {
-    /// <summary>
-    /// The main entry point of the application.
-    /// </summary>
-    /// <returns>
-    /// A task that represents the asynchronous operation.
-    /// </returns>
     private static async Task Main()
     {
-        Console.WriteLine("=== Genova.Conduit Corny Joke Demo ===");
+        Console.WriteLine("=== Genova.Conduit Responses API Corny Joke + Local DateTime Demo ===");
         Console.Write("Enter a topic (e.g. Work, Home, Relationships): ");
         string? topic = Console.ReadLine();
 
@@ -26,7 +22,6 @@ internal class Program
             return;
         }
 
-        // Read API key from environment variable
         string? apiKey = Environment.GetEnvironmentVariable("openai-genova-api-key");
         if (string.IsNullOrWhiteSpace(apiKey))
         {
@@ -35,34 +30,77 @@ internal class Program
             return;
         }
 
-        // Create a chat model client and a single-step pipeline
-        OpenAiChatModelClient chatClient = new (apiKey, modelId: "gpt-4o-mini");
-        CornyJokeStep jokeStep = new (chatClient, topic.Trim());
-        SimplePipeline pipeline = new (jokeStep);
+        // Create the Responses-based chat client.
+        IChatClient chatClient = new OpenAiResponseClient(apiKey, "gpt-4o-mini");
 
-        // Build the context and run the pipeline
+        // Register local tools in an in-memory registry.
+        ITool[] tools =
+        [
+            new LocalDateTimeTool()
+        ];
+
+        IToolRegistry toolRegistry = new InMemoryToolRegistry(tools);
+
+        // Build the pipeline steps:
+        // 1. Generate a corny joke about the topic (using Responses API).
+        // 2. Invoke the LocalDateTime tool and store the result in the context.
+        IPipelineStep jokeStep = new CornyJokeStep(chatClient, topic.Trim());
+        IPipelineStep dateTimeStep = new InvokeToolStep(
+            toolRegistry,
+            "LocalDateTime",
+            "LocalDateTimeArguments",
+            "CurrentDateTime");
+
+        SimplePipeline pipeline = new (jokeStep, dateTimeStep);
+
+        // Prepare the pipeline context.
         PipelineContext context = new (ExecutionEnvironment.Application);
         context.SetItem("Topic", topic.Trim());
 
+        IDictionary<string, object?> dateTimeArguments = new Dictionary<string, object?>
+        {
+            ["kind"] = "local",  // or "utc"
+            ["format"] = "G"    // general date/time pattern
+        };
+
+        context.SetItem("LocalDateTimeArguments", dateTimeArguments);
+
         try
         {
-            await pipeline.ExecuteAsync(context);
+            await pipeline.ExecuteAsync(context, CancellationToken.None);
         }
         catch (Exception ex)
         {
-            Console.WriteLine("An error occurred while generating the joke:");
+            Console.WriteLine("An error occurred while running the pipeline:");
             Console.WriteLine(ex.Message);
             return;
         }
 
-        // Retrieve the joke from the context
         string? joke = context.GetItem<string>("CornyJoke");
+        string? currentDateTime = context.GetItem<string>("CurrentDateTime");
 
         Console.WriteLine();
-        Console.WriteLine("Here is your corny joke:");
-        Console.WriteLine("------------------------");
-        Console.WriteLine(string.IsNullOrWhiteSpace(joke)
-            ? "(No joke was generated.)"
-            : joke);
+        Console.WriteLine("Here is your corny joke (from /v1/responses):");
+        Console.WriteLine("--------------------------------------------");
+        if (string.IsNullOrWhiteSpace(joke))
+        {
+            Console.WriteLine("(No joke was generated.)");
+        }
+        else
+        {
+            Console.WriteLine(joke);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Local date and time:");
+        Console.WriteLine("--------------------");
+        if (string.IsNullOrWhiteSpace(currentDateTime))
+        {
+            Console.WriteLine("(No date/time was generated.)");
+        }
+        else
+        {
+            Console.WriteLine(currentDateTime);
+        }
     }
 }

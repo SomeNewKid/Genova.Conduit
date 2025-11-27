@@ -3,21 +3,21 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit.Models;
+namespace Genova.Conduit.Embeddings;
 
 /// <summary>
-/// Represents the result of a chat completion request.
+/// Defines a request for embedding one or more inputs into vector space.
 /// </summary>
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
-public sealed class ChatCompletionResult
+public sealed class EmbeddingRequest
 {
     /// <summary>
-    /// Gets or sets the assistant message produced by the model.
+    /// Gets or sets the textual inputs to embed.
     /// </summary>
-    public ChatMessage? Message { get; set; }
+    public IList<string> Inputs { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets raw provider-specific data, if any.
+    /// Gets or sets an optional model identifier to use for this request.
     /// </summary>
-    public object? ProviderMetadata { get; set; }
+    public string? ModelId { get; set; }
 }
