@@ -30,11 +30,6 @@
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Remove="Data\**" />
-    <EmbeddedResource Remove="Data\**" />
-    <None Remove="Data\**" />
-  </ItemGroup>
 
   <!-- Package References -->
   <ItemGroup>
@@ -64,6 +59,11 @@
   <!-- Additional files -->
   <ItemGroup>
     <AdditionalFiles Include="..\stylecop.json" />
+  </ItemGroup>
+
+  <!-- Embedded Resources -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\**" />
   </ItemGroup>
 
 </Project>

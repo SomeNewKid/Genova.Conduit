@@ -28,9 +28,13 @@ public sealed class OpenAiChatClient : IChatClient, IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiChatClient"/> class.
     /// </summary>
+    /// <param name="httpClientFactory">
+    /// The HTTP client factory used to create <see cref="HttpClient"/> instances.
+    /// </param>
     /// <param name="apiKey">The OpenAI API key.</param>
     /// <param name="modelId">The model identifier (e.g. "gpt-4o-mini").</param>
-    public OpenAiChatClient(string apiKey, string modelId = "gpt-4o-mini")
+    public OpenAiChatClient(
+        IHttpClientFactory httpClientFactory, string apiKey, string modelId = "gpt-4o-mini")
     {
         if (string.IsNullOrWhiteSpace(apiKey))
         {
@@ -39,15 +43,20 @@ public sealed class OpenAiChatClient : IChatClient, IDisposable
 
         _modelId = modelId ?? throw new ArgumentNullException(nameof(modelId));
 
-        _httpClient = new HttpClient
+        HttpClient client = httpClientFactory.CreateClient("Genova.Conduit.OpenAI.Embeddings");
+
+        if (client.BaseAddress == null)
         {
-            BaseAddress = new Uri("https://api.openai.com/v1/"),
-        };
+            client.BaseAddress = new Uri("https://api.openai.com/v1/");
+        }
 
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        if (client.DefaultRequestHeaders.Authorization == null)
+        {
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", apiKey);
+        }
 
-        // If needed, set OpenAI organization header here:
-        // _httpClient.DefaultRequestHeaders.Add("OpenAI-Organization", "org-...");
+        _httpClient = client;
     }
 
     /// <inheritdoc/>

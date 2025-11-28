@@ -1,6 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -29,12 +30,16 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiResponseClient"/> class.
     /// </summary>
+    /// <param name="httpClientFactory">
+    /// The HTTP client factory used to create <see cref="HttpClient"/> instances.
+    /// </param>
     /// <param name="apiKey">The OpenAI API key.</param>
     /// <param name="defaultModel">
     /// The default model to use when <see cref="ChatRequest.ModelId"/> is null.
     /// For example, <c>\"gpt-4o-mini\"</c>.
     /// </param>
-    public OpenAiResponseClient(string apiKey, string defaultModel = "gpt-4o-mini")
+    public OpenAiResponseClient(
+        IHttpClientFactory httpClientFactory, string apiKey, string defaultModel = "gpt-4o-mini")
     {
         if (string.IsNullOrWhiteSpace(apiKey))
         {
@@ -48,13 +53,20 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
 
         _defaultModel = defaultModel;
 
-        _httpClient = new HttpClient
-        {
-            BaseAddress = new Uri("https://api.openai.com/v1/"),
-        };
+        HttpClient client = httpClientFactory.CreateClient("Genova.Conduit.OpenAI.Embeddings");
 
-        _httpClient.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", apiKey);
+        if (client.BaseAddress == null)
+        {
+            client.BaseAddress = new Uri("https://api.openai.com/v1/");
+        }
+
+        if (client.DefaultRequestHeaders.Authorization == null)
+        {
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+
+        _httpClient = client;
 
         _jsonOptions = new JsonSerializerOptions
         {

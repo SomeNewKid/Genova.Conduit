@@ -22,7 +22,7 @@ public interface IVectorStore
 
     /// <summary>
     /// Performs a similarity search against the store using the specified
-    /// <paramref name="embedding"/>.
+    /// <paramref name="embedding"/>, returning at most <paramref name="topK"/> results.
     /// </summary>
     /// <param name="embedding">The query embedding.</param>
     /// <param name="topK">The maximum number of results to return.</param>
@@ -31,5 +31,34 @@ public interface IVectorStore
     Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
         IReadOnlyList<float> embedding,
         int topK,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Performs a similarity search against the store using the specified
+    /// <paramref name="embedding"/>, returning all results whose similarity
+    /// score is greater than or equal to <paramref name="minConfidence"/>,
+    /// limited to at most <paramref name="maxResults"/> items.
+    /// </summary>
+    /// <param name="embedding">The query embedding.</param>
+    /// <param name="minConfidence">
+    /// The minimum cosine similarity score required for a result to be included.
+    /// Expected range is between 0.0 and 1.0. A typical starting value is 0.2,
+    /// which tends to filter out obviously irrelevant matches while retaining
+    /// potentially relevant results.
+    /// </param>
+    /// <param name="maxResults">
+    /// The maximum number of results to return after applying the confidence filter.
+    /// A typical starting value is 5, which provides sufficient context without
+    /// overwhelming the language model or incurring unnecessary token costs.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>
+    /// A collection of search results ordered by similarity. The collection may be empty
+    /// if no records meet the minimum confidence.
+    /// </returns>
+    Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
+        IReadOnlyList<float> embedding,
+        float minConfidence = 0.2f,
+        int maxResults = 5,
         CancellationToken cancellationToken = default);
 }
