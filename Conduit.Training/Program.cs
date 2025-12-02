@@ -111,10 +111,10 @@ internal static class Program
     /// </summary>
     private static async Task<IList<string>> ReadChunksAsync(string path)
     {
-        List<string> chunks = new List<string>();
+        List<string> chunks = [];
 
         using FileStream fs = File.OpenRead(path);
-        using StreamReader reader = new StreamReader(fs, Encoding.UTF8);
+        using StreamReader reader = new (fs, Encoding.UTF8);
 
         while (!reader.EndOfStream)
         {
@@ -137,7 +137,7 @@ internal static class Program
         IList<string> chunks,
         EmbeddingResponse response)
     {
-        IList<VectorRecord> records = new List<VectorRecord>(chunks.Count);
+        List<VectorRecord> records = new (chunks.Count);
 
         for (int i = 0; i < chunks.Count; i++)
         {
@@ -145,7 +145,7 @@ internal static class Program
 
             Embedding embedding = response.Embeddings[i];
 
-            VectorRecord record = new VectorRecord
+            VectorRecord record = new ()
             {
                 Id = id,
                 Embedding = embedding.Values,
@@ -158,7 +158,7 @@ internal static class Program
             records.Add(record);
         }
 
-        VectorStoreSnapshot snapshot = new VectorStoreSnapshot
+        VectorStoreSnapshot snapshot = new ()
         {
             ModelId = "text-embedding-3-small",
             CreatedAt = DateTimeOffset.UtcNow,

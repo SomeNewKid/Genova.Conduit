@@ -1,7 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
-namespace Genova.Conduit;
+namespace Genova.Conduit.Pipelines;
 
 /// <summary>
 /// Represents a single, deterministic unit of work within a pipeline.

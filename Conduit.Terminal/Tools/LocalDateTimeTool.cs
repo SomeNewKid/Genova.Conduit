@@ -3,8 +3,10 @@
 
 using System.Globalization;
 using Genova.Common.Attributes;
+using Genova.Conduit.Pipelines;
+using Genova.Conduit.Tools;
 
-namespace Genova.Conduit.Tools;
+namespace Genova.Conduit.Terminal.Tools;
 
 /// <summary>
 /// Represents a simple local tool that returns the current date and time

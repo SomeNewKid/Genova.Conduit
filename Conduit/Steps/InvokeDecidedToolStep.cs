@@ -2,6 +2,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Genova.Common.Attributes;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Tools;
 
 namespace Genova.Conduit.Steps;
@@ -100,10 +101,7 @@ public sealed class InvokeDecidedToolStep : InvokeToolStepBase
             return new Dictionary<string, object?>();
         }
 
-        IDictionary<string, object?>? cast =
-            rawArguments as IDictionary<string, object?>;
-
-        if (cast == null)
+        if (rawArguments is not IDictionary<string, object?> cast)
         {
             throw new InvalidOperationException(
                 $"Context item '{ArgumentsKey}' is not an IDictionary<string, object?>.");

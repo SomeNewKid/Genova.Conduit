@@ -65,5 +65,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Data\**" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tasks\" />
+  </ItemGroup>
 
 </Project>

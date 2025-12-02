@@ -4,20 +4,24 @@
 namespace Genova.Conduit.Agents;
 
 /// <summary>
-/// Coordinates the execution of one or more agents, including loading
-/// and saving state and selecting which pipelines or steps to run.
+/// Represents a coordinator responsible for executing a single run cycle
+/// of an agent. The orchestrator loads the agent's state, prepares any
+/// required context, invokes the agent, persists updated state, and
+/// returns the <see cref="AgentRunResult"/> to the caller.
 /// </summary>
 public interface IAgentOrchestrator
 {
     /// <summary>
-    /// Executes a single orchestration cycle for the agent with the given identifier.
+    /// Executes one cycle of work for the agent identified by <paramref name="agentId"/>.
+    /// This includes loading and persisting state before and after the agent run.
     /// </summary>
-    /// <param name="agentId">The identifier of the agent to orchestrate.</param>
-    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <param name="agentId">The identifier of the agent to run.</param>
+    /// <param name="cancellationToken">A token that may be used to observe cancellation.</param>
     /// <returns>
-    /// A task that completes when the orchestration cycle has finished.
+    /// A task whose result is an <see cref="AgentRunResult"/> describing the outcome
+    /// of the agent's run cycle.
     /// </returns>
-    Task RunOnceAsync(
+    Task<AgentRunResult> RunOnceAsync(
         string agentId,
         CancellationToken cancellationToken = default);
 }

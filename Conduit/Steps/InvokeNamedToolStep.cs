@@ -2,6 +2,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Genova.Common.Attributes;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Tools;
 
 namespace Genova.Conduit.Steps;

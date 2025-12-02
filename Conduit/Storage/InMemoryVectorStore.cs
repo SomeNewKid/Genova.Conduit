@@ -58,7 +58,7 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
 
         if (cancellationToken.IsCancellationRequested)
         {
-            TaskCompletionSource tcs = new TaskCompletionSource();
+            TaskCompletionSource tcs = new ();
             tcs.SetCanceled(cancellationToken);
             return tcs.Task;
         }
@@ -123,8 +123,7 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
 
         if (cancellationToken.IsCancellationRequested)
         {
-            TaskCompletionSource<IReadOnlyList<VectorSearchResult>> tcs =
-                new TaskCompletionSource<IReadOnlyList<VectorSearchResult>>();
+            TaskCompletionSource<IReadOnlyList<VectorSearchResult>> tcs = new();
             tcs.SetCanceled(cancellationToken);
             return tcs.Task;
         }
@@ -133,7 +132,7 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
 
         if (allResults.Count > topK)
         {
-            List<VectorSearchResult> truncated = new List<VectorSearchResult>(topK);
+            List<VectorSearchResult> truncated = new(topK);
             for (int i = 0; i < topK; i++)
             {
                 truncated.Add(allResults[i]);
@@ -197,15 +196,14 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
 
         if (cancellationToken.IsCancellationRequested)
         {
-            TaskCompletionSource<IReadOnlyList<VectorSearchResult>> tcs =
-                new TaskCompletionSource<IReadOnlyList<VectorSearchResult>>();
+            TaskCompletionSource<IReadOnlyList<VectorSearchResult>> tcs = new();
             tcs.SetCanceled(cancellationToken);
             return tcs.Task;
         }
 
         IReadOnlyList<VectorSearchResult> allResults = GetSortedResults(embedding);
 
-        List<VectorSearchResult> filtered = new List<VectorSearchResult>();
+        List<VectorSearchResult> filtered = [];
 
         for (int i = 0; i < allResults.Count; i++)
         {
@@ -219,7 +217,7 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
 
         if (filtered.Count > maxResults)
         {
-            List<VectorSearchResult> truncated = new List<VectorSearchResult>(maxResults);
+            List<VectorSearchResult> truncated = new(maxResults);
             for (int i = 0; i < maxResults; i++)
             {
                 truncated.Add(filtered[i]);
@@ -272,11 +270,11 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
     /// Computes cosine similarity between the query embedding and all stored records,
     /// and returns the results sorted in descending order of similarity.
     /// </summary>
-    private IReadOnlyList<VectorSearchResult> GetSortedResults(IReadOnlyList<float> embedding)
+    private List<VectorSearchResult> GetSortedResults(IReadOnlyList<float> embedding)
     {
         IList<VectorRecord> allRecords = GetAllValues();
 
-        List<VectorSearchResult> results = new List<VectorSearchResult>();
+        List<VectorSearchResult> results = [];
 
         for (int i = 0; i < allRecords.Count; i++)
         {
@@ -289,7 +287,7 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
 
             double score = ComputeCosineSimilarity(embedding, record.Embedding);
 
-            VectorSearchResult result = new VectorSearchResult
+            VectorSearchResult result = new ()
             {
                 Record = record,
                 Score = score,
@@ -299,7 +297,7 @@ public sealed class InMemoryVectorStore : InMemoryStoreBase<VectorRecord>, IVect
         }
 
         results.Sort(
-            (VectorSearchResult left, VectorSearchResult right) =>
+            (left, right) =>
             {
                 // Sort descending by score.
                 return right.Score.CompareTo(left.Score);

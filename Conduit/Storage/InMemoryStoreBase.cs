@@ -13,7 +13,6 @@ namespace Genova.Conduit.Storage;
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public abstract class InMemoryStoreBase<TValue>
 {
-    private readonly int _capacity;
     private readonly object _syncRoot;
     private readonly Dictionary<string, InMemoryStoreItem<TValue>> _items;
 
@@ -37,7 +36,7 @@ public abstract class InMemoryStoreBase<TValue>
                 "Capacity must be greater than zero.");
         }
 
-        _capacity = capacity;
+        Capacity = capacity;
         _syncRoot = new object();
         _items = new Dictionary<string, InMemoryStoreItem<TValue>>(StringComparer.Ordinal);
     }
@@ -45,10 +44,7 @@ public abstract class InMemoryStoreBase<TValue>
     /// <summary>
     /// Gets the maximum number of items that can be stored at any time.
     /// </summary>
-    protected int Capacity
-    {
-        get { return _capacity; }
-    }
+    protected int Capacity { get; }
 
     /// <summary>
     /// Tries to get a value from the store by its key.
@@ -107,7 +103,7 @@ public abstract class InMemoryStoreBase<TValue>
 
             _items[key] = item;
 
-            if (_items.Count > _capacity)
+            if (_items.Count > Capacity)
             {
                 EvictOldestItems();
             }
@@ -124,7 +120,7 @@ public abstract class InMemoryStoreBase<TValue>
     {
         lock (_syncRoot)
         {
-            List<TValue> values = new List<TValue>(_items.Count);
+            List<TValue> values = new(_items.Count);
             foreach (KeyValuePair<string, InMemoryStoreItem<TValue>> pair in _items)
             {
                 values.Add(pair.Value.Value);
@@ -136,7 +132,7 @@ public abstract class InMemoryStoreBase<TValue>
 
     private void EvictOldestItems()
     {
-        while (_items.Count > _capacity)
+        while (_items.Count > Capacity)
         {
             string? oldestKey = null;
             DateTimeOffset oldestTimestamp = DateTimeOffset.MaxValue;

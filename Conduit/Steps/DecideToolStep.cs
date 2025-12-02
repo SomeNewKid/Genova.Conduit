@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Genova.Common.Attributes;
 using Genova.Conduit.Chats;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Tools;
 
 namespace Genova.Conduit.Steps;
@@ -90,7 +91,7 @@ public sealed class DecideToolStep : IPipelineStep
         _selectedToolNameKey = selectedToolNameKey;
         _selectedToolArgumentsKey = selectedToolArgumentsKey;
 
-        JsonSerializerOptions options = new JsonSerializerOptions
+        JsonSerializerOptions options = new ()
         {
             PropertyNameCaseInsensitive = true,
         };
@@ -120,7 +121,7 @@ public sealed class DecideToolStep : IPipelineStep
 
         string toolsDescription = BuildToolsDescription(_toolRegistry.GetAllTools());
 
-        ChatRequest request = new ChatRequest
+        ChatRequest request = new ()
         {
             ModelId = null,
             MaxTokens = 256,
@@ -156,9 +157,7 @@ public sealed class DecideToolStep : IPipelineStep
         ChatResponse response = await _chatClient.GenerateAsync(request, cancellationToken)
             .ConfigureAwait(false);
 
-        string? jsonText = response.Message != null
-            ? response.Message.Content
-            : null;
+        string? jsonText = response.Message?.Content;
 
         if (string.IsNullOrWhiteSpace(jsonText))
         {
@@ -190,7 +189,7 @@ public sealed class DecideToolStep : IPipelineStep
 
     private static string BuildToolsDescription(IEnumerable<ITool> tools)
     {
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new ();
 
         foreach (ITool tool in tools)
         {

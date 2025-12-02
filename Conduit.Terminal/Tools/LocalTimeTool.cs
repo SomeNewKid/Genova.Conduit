@@ -3,11 +3,13 @@
 
 using System.Globalization;
 using Genova.Common.Attributes;
+using Genova.Conduit.Pipelines;
+using Genova.Conduit.Tools;
 
-namespace Genova.Conduit.Tools;
+namespace Genova.Conduit.Terminal.Tools;
 
 /// <summary>
-/// Represents a simple local tool that returns the current date
+/// Represents a simple local tool that returns the current time
 /// as a formatted string.
 /// </summary>
 /// <remarks>
@@ -21,14 +23,14 @@ namespace Genova.Conduit.Tools;
 /// </item>
 /// <item>
 /// <description>
-/// <c>"format"</c> – a .NET date format string. Defaults to <c>"d"</c>
-/// (short date pattern).
+/// <c>"format"</c> – a .NET time format string. Defaults to <c>"T"</c>
+/// (long time pattern).
 /// </description>
 /// </item>
 /// </list>
 /// </remarks>
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
-public sealed class LocalDateTool : ITool
+public sealed class LocalTimeTool : ITool
 {
     private const string KindArgumentName = "kind";
     private const string FormatArgumentName = "format";
@@ -38,7 +40,7 @@ public sealed class LocalDateTool : ITool
     /// </summary>
     public string Name
     {
-        get { return "LocalDate"; }
+        get { return "LocalTime"; }
     }
 
     /// <summary>
@@ -46,7 +48,7 @@ public sealed class LocalDateTool : ITool
     /// </summary>
     public string Description
     {
-        get { return "Returns the current date as a formatted string."; }
+        get { return "Returns the current time as a formatted string."; }
     }
 
     /// <summary>
@@ -63,17 +65,14 @@ public sealed class LocalDateTool : ITool
     /// A token that may be used to observe cancellation.
     /// </param>
     /// <returns>
-    /// A task whose result is a string representing the current date.
+    /// A task whose result is a string representing the current time.
     /// </returns>
     public Task<object?> InvokeAsync(
         IDictionary<string, object?> arguments,
         PipelineContext context,
         CancellationToken cancellationToken = default)
     {
-        if (arguments == null)
-        {
-            throw new ArgumentNullException(nameof(arguments));
-        }
+        ArgumentNullException.ThrowIfNull(arguments);
 
         DateTime now = GetNow(arguments);
         string format = GetFormat(arguments);
@@ -89,16 +88,16 @@ public sealed class LocalDateTool : ITool
         {
             if (string.Equals(kindString, "utc", StringComparison.OrdinalIgnoreCase))
             {
-                return DateTime.UtcNow.Date;
+                return DateTime.UtcNow;
             }
 
             if (string.Equals(kindString, "local", StringComparison.OrdinalIgnoreCase))
             {
-                return DateTime.Now.Date;
+                return DateTime.Now;
             }
         }
 
-        return DateTime.Now.Date;
+        return DateTime.Now;
     }
 
     private static string GetFormat(IDictionary<string, object?> arguments)
@@ -110,6 +109,6 @@ public sealed class LocalDateTool : ITool
             return formatString;
         }
 
-        return "d";
+        return "T";
     }
 }

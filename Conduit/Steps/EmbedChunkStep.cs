@@ -3,6 +3,7 @@
 
 using Genova.Common.Attributes;
 using Genova.Conduit.Embeddings;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Storage;
 
 namespace Genova.Conduit.Steps;
@@ -46,10 +47,7 @@ public sealed class EmbedChunkStep : IPipelineStep
         string chunksKey,
         string embeddingsKey)
     {
-        if (embeddingClient == null)
-        {
-            throw new ArgumentNullException(nameof(embeddingClient));
-        }
+        ArgumentNullException.ThrowIfNull(embeddingClient);
 
         if (string.IsNullOrWhiteSpace(chunksKey))
         {
@@ -84,10 +82,7 @@ public sealed class EmbedChunkStep : IPipelineStep
         PipelineContext context,
         CancellationToken cancellationToken = default)
     {
-        if (context == null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        ArgumentNullException.ThrowIfNull(context);
 
         // Retrieve the chunks from the context
         object? rawChunks = context.GetItem<object>(_chunksKey);
@@ -98,9 +93,7 @@ public sealed class EmbedChunkStep : IPipelineStep
                 $"Pipeline context does not contain any text chunks under key '{_chunksKey}'.");
         }
 
-        IList<string>? chunks = rawChunks as IList<string>;
-
-        if (chunks == null)
+        if (rawChunks is not IList<string> chunks)
         {
             throw new InvalidOperationException(
                 $"Context item '{_chunksKey}' is not an IList<string>.");
@@ -113,7 +106,7 @@ public sealed class EmbedChunkStep : IPipelineStep
         }
 
         // Build the embedding request
-        EmbeddingRequest request = new EmbeddingRequest
+        EmbeddingRequest request = new ()
         {
             Inputs = chunks,
             ModelId = null, // Use the embedding client's default model

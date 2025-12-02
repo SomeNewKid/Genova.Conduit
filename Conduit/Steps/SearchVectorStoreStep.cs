@@ -3,6 +3,7 @@
 
 using Genova.Common.Attributes;
 using Genova.Conduit.Embeddings;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Storage;
 
 namespace Genova.Conduit.Steps;
@@ -58,10 +59,7 @@ public sealed class SearchVectorStoreStep : IPipelineStep
         string searchResultsKey,
         int topK)
     {
-        if (vectorStore == null)
-        {
-            throw new ArgumentNullException(nameof(vectorStore));
-        }
+        ArgumentNullException.ThrowIfNull(vectorStore);
 
         if (string.IsNullOrWhiteSpace(queryEmbeddingKey))
         {
@@ -106,10 +104,7 @@ public sealed class SearchVectorStoreStep : IPipelineStep
         PipelineContext context,
         CancellationToken cancellationToken = default)
     {
-        if (context == null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        ArgumentNullException.ThrowIfNull(context);
 
         object? rawEmbeddingResponse = context.GetItem<object>(_queryEmbeddingKey);
         if (rawEmbeddingResponse == null)
@@ -118,8 +113,7 @@ public sealed class SearchVectorStoreStep : IPipelineStep
                 $"Pipeline context does not contain an EmbeddingResponse under key '{_queryEmbeddingKey}'.");
         }
 
-        EmbeddingResponse? embeddingResponse = rawEmbeddingResponse as EmbeddingResponse;
-        if (embeddingResponse == null)
+        if (rawEmbeddingResponse is not EmbeddingResponse embeddingResponse)
         {
             throw new InvalidOperationException(
                 $"Context item '{_queryEmbeddingKey}' is not an EmbeddingResponse.");

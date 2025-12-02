@@ -1,39 +1,40 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Threading;
+using System.Threading.Tasks;
+using Genova.Common.Attributes;
+using Genova.Conduit.Pipelines;
+
 namespace Genova.Conduit.Agents;
 
 /// <summary>
-/// Represents an agent that can process tasks or events using one or more pipelines.
+/// Represents an autonomous agent capable of performing work over time.
+/// An agent receives a <see cref="PipelineContext"/>, its persisted
+/// <see cref="AgentState"/>, performs one cycle of work, and returns an
+/// <see cref="AgentRunResult"/> indicating the outcome.
 /// </summary>
-/// <remarks>
-/// Agents are long-lived logical entities whose state is persisted between
-/// invocations. Host code is responsible for scheduling when an agent runs.
-/// </remarks>
 public interface IAgent
 {
     /// <summary>
-    /// Gets the unique identifier of the agent.
+    /// Gets the unique identifier for the agent.
     /// </summary>
     string Id { get; }
 
     /// <summary>
-    /// Executes a single unit of work for this agent using the specified
-    /// <paramref name="context"/> and <paramref name="state"/>.
+    /// Executes a single cycle of agent work using the provided
+    /// <see cref="PipelineContext"/> and persisted <see cref="AgentState"/>.
+    /// The agent updates the state and returns an <see cref="AgentRunResult"/>
+    /// indicating whether it has completed work for the cycle, is waiting on
+    /// external events, or has encountered a failure.
     /// </summary>
-    /// <param name="context">
-    /// A pipeline context that carries input, intermediate data, and output
-    /// for this particular execution.
-    /// </param>
-    /// <param name="state">
-    /// The current persistent state of the agent, which may be updated
-    /// and subsequently stored by the orchestrator.
-    /// </param>
-    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <param name="context">The pipeline context for this agent run.</param>
+    /// <param name="state">The persisted agent state.</param>
+    /// <param name="cancellationToken">A token that may be used to observe cancellation.</param>
     /// <returns>
-    /// A task that represents the asynchronous operation.
+    /// A task whose result is an <see cref="AgentRunResult"/> describing the outcome.
     /// </returns>
-    Task RunAsync(
+    Task<AgentRunResult> RunAsync(
         PipelineContext context,
         AgentState state,
         CancellationToken cancellationToken = default);

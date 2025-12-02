@@ -2,6 +2,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Genova.Common.Attributes;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Tools;
 
 namespace Genova.Conduit.Steps;
@@ -14,10 +15,6 @@ namespace Genova.Conduit.Steps;
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public abstract class InvokeToolStepBase : IPipelineStep
 {
-    private readonly IToolRegistry _toolRegistry;
-    private readonly string _argumentsKey;
-    private readonly string _resultKey;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="InvokeToolStepBase"/> class.
     /// </summary>
@@ -57,34 +54,25 @@ public abstract class InvokeToolStepBase : IPipelineStep
             throw new ArgumentException("Result key must be non-empty.", nameof(resultKey));
         }
 
-        _toolRegistry = toolRegistry;
-        _argumentsKey = argumentsKey;
-        _resultKey = resultKey;
+        ToolRegistry = toolRegistry;
+        ArgumentsKey = argumentsKey;
+        ResultKey = resultKey;
     }
 
     /// <summary>
     /// Gets the tool registry used to resolve tools by name.
     /// </summary>
-    protected IToolRegistry ToolRegistry
-    {
-        get { return _toolRegistry; }
-    }
+    protected IToolRegistry ToolRegistry { get; }
 
     /// <summary>
     /// Gets the context key that identifies the tool arguments.
     /// </summary>
-    protected string ArgumentsKey
-    {
-        get { return _argumentsKey; }
-    }
+    protected string ArgumentsKey { get; }
 
     /// <summary>
     /// Gets the context key that identifies where the tool result is stored.
     /// </summary>
-    protected string ResultKey
-    {
-        get { return _resultKey; }
-    }
+    protected string ResultKey { get; }
 
     /// <summary>
     /// Executes the step by resolving the tool, reading arguments, invoking the tool,
@@ -106,7 +94,7 @@ public abstract class InvokeToolStepBase : IPipelineStep
             return;
         }
 
-        if (!_toolRegistry.TryGetTool(toolName, out ITool? tool) || tool == null)
+        if (!ToolRegistry.TryGetTool(toolName, out ITool? tool) || tool == null)
         {
             throw new InvalidOperationException(
                 $"Tool '{toolName}' was not found in the registry.");
@@ -119,7 +107,7 @@ public abstract class InvokeToolStepBase : IPipelineStep
             context,
             cancellationToken).ConfigureAwait(false);
 
-        context.SetItem(_resultKey, result);
+        context.SetItem(ResultKey, result);
     }
 
     /// <summary>
@@ -151,17 +139,17 @@ public abstract class InvokeToolStepBase : IPipelineStep
     /// </exception>
     protected virtual IDictionary<string, object?> GetArguments(PipelineContext context)
     {
-        object? rawArgs = context.GetItem<object>(_argumentsKey);
+        object? rawArgs = context.GetItem<object>(ArgumentsKey);
         if (rawArgs == null)
         {
             throw new InvalidOperationException(
-                $"Pipeline context does not contain arguments under key '{_argumentsKey}'.");
+                $"Pipeline context does not contain arguments under key '{ArgumentsKey}'.");
         }
 
         if (rawArgs is not IDictionary<string, object?> args)
         {
             throw new InvalidOperationException(
-                $"Context item '{_argumentsKey}' is not an IDictionary<string, object?>.");
+                $"Context item '{ArgumentsKey}' is not an IDictionary<string, object?>.");
         }
 
         return args;

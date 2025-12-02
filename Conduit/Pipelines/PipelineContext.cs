@@ -3,7 +3,7 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit;
+namespace Genova.Conduit.Pipelines;
 
 /// <summary>
 /// Shared, mutable context that flows through all steps in a pipeline.
@@ -84,5 +84,14 @@ public sealed class PipelineContext
     public void SetItem<T>(string key, T value)
     {
         Items[key] = value;
+    }
+
+    /// <summary>
+    /// Removes an item from <see cref="Items"/> with the specified key.
+    /// </summary>
+    /// <param name="key">The lookup key.</param>
+    public void RemoveItem(string key)
+    {
+        Items.Remove(key);
     }
 }

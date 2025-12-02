@@ -2,8 +2,9 @@
 // See the LICENSE file in the project root for more information.
 
 using Genova.Conduit.Chats;
+using Genova.Conduit.Pipelines;
 
-namespace Genova.Conduit.Terminal;
+namespace Genova.Conduit.Terminal.Steps;
 
 /// <summary>
 /// A pipeline step that asks OpenAI for a corny joke about a given topic

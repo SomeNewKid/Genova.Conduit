@@ -51,13 +51,12 @@ public sealed class InMemoryConversationStore : InMemoryStoreBase<Conversation>,
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            TaskCompletionSource<Conversation?> tcs = new TaskCompletionSource<Conversation?>();
+            TaskCompletionSource<Conversation?> tcs = new ();
             tcs.SetCanceled(cancellationToken);
             return tcs.Task;
         }
 
-        Conversation? conversation;
-        bool found = TryGetValue(conversationId, out conversation);
+        bool found = TryGetValue(conversationId, out Conversation? conversation);
 
         if (!found)
         {
@@ -85,7 +84,7 @@ public sealed class InMemoryConversationStore : InMemoryStoreBase<Conversation>,
 
         if (cancellationToken.IsCancellationRequested)
         {
-            TaskCompletionSource tcs = new TaskCompletionSource();
+            TaskCompletionSource tcs = new ();
             tcs.SetCanceled(cancellationToken);
             return tcs.Task;
         }

@@ -3,7 +3,7 @@
 
 using Genova.Common.Attributes;
 
-namespace Genova.Conduit;
+namespace Genova.Conduit.Pipelines;
 
 /// <summary>
 /// Execution environment in which a pipeline is currently running.

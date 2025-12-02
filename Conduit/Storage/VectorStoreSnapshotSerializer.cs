@@ -1,6 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Genova.Common.Attributes;
@@ -14,11 +15,12 @@ namespace Genova.Conduit.Storage;
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public static class VectorStoreSnapshotSerializer
 {
+    [SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "Conflicting naming rules.")]
     private static readonly JsonSerializerOptions _jsonOptions;
 
     static VectorStoreSnapshotSerializer()
     {
-        JsonSerializerOptions options = new JsonSerializerOptions
+        JsonSerializerOptions options = new ()
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

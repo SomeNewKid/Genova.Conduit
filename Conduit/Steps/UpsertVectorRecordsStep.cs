@@ -4,6 +4,7 @@
 using System.Globalization;
 using Genova.Common.Attributes;
 using Genova.Conduit.Embeddings;
+using Genova.Conduit.Pipelines;
 using Genova.Conduit.Storage;
 
 namespace Genova.Conduit.Steps;
@@ -63,10 +64,7 @@ public sealed class UpsertVectorRecordsStep : IPipelineStep
         string vectorRecordsKey,
         string idPrefix)
     {
-        if (vectorStore == null)
-        {
-            throw new ArgumentNullException(nameof(vectorStore));
-        }
+        ArgumentNullException.ThrowIfNull(vectorStore);
 
         if (string.IsNullOrWhiteSpace(chunksKey))
         {
@@ -113,10 +111,7 @@ public sealed class UpsertVectorRecordsStep : IPipelineStep
         PipelineContext context,
         CancellationToken cancellationToken = default)
     {
-        if (context == null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
+        ArgumentNullException.ThrowIfNull(context);
 
         // Retrieve chunks from the context.
         object? rawChunks = context.GetItem<object>(_chunksKey);
@@ -126,8 +121,7 @@ public sealed class UpsertVectorRecordsStep : IPipelineStep
                 $"Pipeline context does not contain any text chunks under key '{_chunksKey}'.");
         }
 
-        IList<string>? chunks = rawChunks as IList<string>;
-        if (chunks == null)
+        if (rawChunks is not IList<string> chunks)
         {
             throw new InvalidOperationException(
                 $"Context item '{_chunksKey}' is not an IList<string>.");
@@ -147,8 +141,7 @@ public sealed class UpsertVectorRecordsStep : IPipelineStep
                 $"Pipeline context does not contain an EmbeddingResponse under key '{_embeddingsKey}'.");
         }
 
-        EmbeddingResponse? embeddingResponse = rawEmbeddings as EmbeddingResponse;
-        if (embeddingResponse == null)
+        if (rawEmbeddings is not EmbeddingResponse embeddingResponse)
         {
             throw new InvalidOperationException(
                 $"Context item '{_embeddingsKey}' is not an EmbeddingResponse.");
@@ -169,7 +162,7 @@ public sealed class UpsertVectorRecordsStep : IPipelineStep
         }
 
         // Create vector records.
-        IList<VectorRecord> records = new List<VectorRecord>(chunks.Count);
+        List<VectorRecord> records = new (chunks.Count);
 
         for (int i = 0; i < chunks.Count; i++)
         {
@@ -185,7 +178,7 @@ public sealed class UpsertVectorRecordsStep : IPipelineStep
             string id =
                 _idPrefix + i.ToString(CultureInfo.InvariantCulture);
 
-            VectorRecord record = new VectorRecord
+            VectorRecord record = new ()
             {
                 Id = id,
                 Embedding = embedding.Values,
