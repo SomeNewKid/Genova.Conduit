@@ -1,46 +1,58 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
-using System.Net.Http;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Genova.Common.Attributes;
+using Genova.Conduit.Tools;
 
 namespace Genova.Conduit.Chats;
 
 /// <summary>
-/// Implementation of <see cref="IChatClient"/> that uses
-/// OpenAI's /v1/responses endpoint instead of /v1/chat/completions.
+/// Represents an implementation of <see cref="IChatClient"/> that uses the
+/// OpenAI Responses API to generate chat completions, including optional
+/// tool definitions.
 /// </summary>
-/// <remarks>
-/// This client maps <see cref="ChatRequest"/> to the Responses API format
-/// and returns a <see cref="ChatResponse"/> with an aggregated text output.
-/// The raw response object is exposed via <see cref="ChatResponse.ProviderMetadata"/>.
-/// </remarks>
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public sealed class OpenAiResponseClient : IChatClient, IDisposable
 {
+    private const string ResponsesEndpoint = "responses";
+
+    [SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "Conflicting naming rules.")]
+    private static readonly JsonSerializerOptions ToolParametersJsonOptions = new ()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     private readonly HttpClient _httpClient;
-    private readonly JsonSerializerOptions _jsonOptions;
     private readonly string _defaultModel;
+    private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiResponseClient"/> class.
     /// </summary>
-    /// <param name="httpClientFactory">
-    /// The HTTP client factory used to create <see cref="HttpClient"/> instances.
-    /// </param>
+    /// <param name="httpClientFactory">The HTTP client factory used to create <see cref="HttpClient"/> instances.</param>
     /// <param name="apiKey">The OpenAI API key.</param>
     /// <param name="defaultModel">
-    /// The default model to use when <see cref="ChatRequest.ModelId"/> is null.
-    /// For example, <c>\"gpt-4o-mini\"</c>.
+    /// The default model identifier to use when <see cref="ChatRequest.ModelId"/> is <c>null</c>.
     /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="httpClientFactory"/> is <c>null</c>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="apiKey"/> or <paramref name="defaultModel"/> is <c>null</c> or whitespace.
+    /// </exception>
     public OpenAiResponseClient(
-        IHttpClientFactory httpClientFactory, string apiKey, string defaultModel = "gpt-4o-mini")
+        IHttpClientFactory httpClientFactory,
+        string apiKey,
+        string defaultModel = "gpt-4o-mini")
     {
+        ArgumentNullException.ThrowIfNull(httpClientFactory);
+
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             throw new ArgumentException("API key must be provided.", nameof(apiKey));
@@ -53,7 +65,7 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
 
         _defaultModel = defaultModel;
 
-        HttpClient client = httpClientFactory.CreateClient("Genova.Conduit.OpenAI.Embeddings");
+        HttpClient client = httpClientFactory.CreateClient("Genova.Conduit.OpenAI.Responses");
 
         if (client.BaseAddress == null)
         {
@@ -68,14 +80,24 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
 
         _httpClient = client;
 
-        _jsonOptions = new JsonSerializerOptions
+        JsonSerializerOptions options = new ()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
+
+        _jsonOptions = options;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Generates a chat response for the specified <paramref name="request"/>.
+    /// </summary>
+    /// <param name="request">The chat request to process.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The chat response produced by the model.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="request"/> is <c>null</c>.
+    /// </exception>
     public async Task<ChatResponse> GenerateAsync(
         ChatRequest request,
         CancellationToken cancellationToken = default)
@@ -84,49 +106,60 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
 
         string modelId = request.ModelId ?? _defaultModel;
 
-        // Map ChatRequest.Messages -> Responses API "input" items
         ResponsesCreateRequestDto payload = new ()
         {
             Model = modelId,
-            Input = MapInputItems(request),
+            Input = MapInputItems(request.Messages),
             MaxOutputTokens = request.MaxTokens,
             Temperature = request.Temperature,
+            Tools = MapTools(request.Tools),
         };
 
         string json = JsonSerializer.Serialize(payload, _jsonOptions);
 
         using StringContent content = new (json, Encoding.UTF8, "application/json");
-        using HttpResponseMessage response = await _httpClient.PostAsync("responses", content, cancellationToken);
 
-        string responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        using HttpResponseMessage response =
+            await _httpClient.PostAsync(ResponsesEndpoint, content, cancellationToken)
+                .ConfigureAwait(false);
+
+        string responseJson =
+            await response.Content.ReadAsStringAsync(cancellationToken)
+                .ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
 
-        ResponsesCreateResponseDto? dto = JsonSerializer.Deserialize<ResponsesCreateResponseDto>(
-            responseJson,
-            _jsonOptions);
+        ResponsesCreateResponseDto? dto =
+            JsonSerializer.Deserialize<ResponsesCreateResponseDto>(responseJson, _jsonOptions);
 
-        // Aggregate text from response.output[*].output_text.content
-        string aggregatedText = ExtractOutputText(dto);
-
-        // The Responses API already has the notion of "role", but for simplicity
-        // we treat the final aggregated text as a single assistant message.
-        ChatMessage message = new ()
+        if (dto == null || dto.Output == null || dto.Output.Count == 0)
         {
-            Role = ChatMessageRole.Assistant,
-            Content = aggregatedText,
+            return new ChatResponse
+            {
+                Message = null,
+                ProviderMetadata = dto,
+            };
+        }
+
+        // For simplicity, treat the first message output as the assistant reply.
+        ResponsesOutputMessageDto messageDto = dto.Output[0];
+
+        ChatMessage assistantMessage = new ()
+        {
+            Role = MapRoleBack(messageDto.Role),
+            Content = messageDto.GetCombinedText(),
         };
 
-        ChatResponse result = new ()
+        return new ChatResponse
         {
-            Message = message,
+            Message = assistantMessage,
             ProviderMetadata = dto,
         };
-
-        return result;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Releases resources used by this <see cref="OpenAiResponseClient"/>.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)
@@ -138,223 +171,179 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
         _httpClient.Dispose();
     }
 
-    private static List<ResponsesInputItemDto> MapInputItems(ChatRequest request)
+    private static List<ResponsesInputItemDto> MapInputItems(IList<ChatMessage> messages)
     {
-        List<ResponsesInputItemDto> items = new (request.Messages.Count);
+        List<ResponsesInputItemDto> list = new (messages.Count);
 
-        foreach (ChatMessage msg in request.Messages)
+        for (int i = 0; i < messages.Count; i++)
         {
-            items.Add(new ResponsesInputItemDto
+            ChatMessage message = messages[i];
+
+            ResponsesInputItemDto item = new ()
             {
-                Type = "message", // required by Responses API for message items
-                Role = MapRole(msg.Role),
-                Content = msg.Content ?? string.Empty,
-            });
+                Type = "message",
+                Role = MapRole(message.Role),
+                Content = message.Content,
+            };
+
+            list.Add(item);
         }
 
-        return items;
+        return list;
     }
 
-    private static string MapRole(ChatMessageRole role) =>
-        role switch
+    private static List<ResponsesToolDefinitionDto>? MapTools(IList<ToolDefinition> tools)
+    {
+        if (tools == null || tools.Count == 0)
+        {
+            return null;
+        }
+
+        List<ResponsesToolDefinitionDto> list = new (tools.Count);
+
+        for (int i = 0; i < tools.Count; i++)
+        {
+            ToolDefinition tool = tools[i];
+
+            if (string.IsNullOrWhiteSpace(tool.Name))
+            {
+                continue;
+            }
+
+            ResponsesToolDefinitionDto dto = new ()
+            {
+                Type = "function",
+                Function = new ResponsesToolFunctionDto
+                {
+                    Name = tool.Name,
+                    Description = tool.Description,
+                    Parameters = JsonSerializer.Deserialize<object>(
+                        tool.ParametersJsonSchema,
+                        ToolParametersJsonOptions) ?? new { },
+                },
+            };
+
+            list.Add(dto);
+        }
+
+        return list.Count == 0 ? null : list;
+    }
+
+    private static string MapRole(ChatMessageRole role)
+    {
+        return role switch
         {
             ChatMessageRole.System => "system",
             ChatMessageRole.User => "user",
             ChatMessageRole.Assistant => "assistant",
             ChatMessageRole.Tool => "tool",
-            _ => "user"
+            _ => "user",
         };
-
-    /// <summary>
-    /// Aggregates all assistant text from the Responses API output into a single string.
-    /// </summary>
-    private static string ExtractOutputText(ResponsesCreateResponseDto? dto)
-    {
-        if (dto?.Output == null || dto.Output.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        StringBuilder sb = new ();
-
-        foreach (ResponsesOutputMessageDto message in dto.Output)
-        {
-            // We expect type == "message" for chat-style responses.
-            if (!string.Equals(message.Type, "message", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (message.Content == null)
-            {
-                continue;
-            }
-
-            foreach (ResponsesContentItemDto content in message.Content)
-            {
-                // We're interested in items where type == "output_text"
-                if (!string.Equals(content.Type, "output_text", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(content.Text))
-                {
-                    continue;
-                }
-
-                if (sb.Length > 0)
-                {
-                    sb.AppendLine().AppendLine();
-                }
-
-                sb.Append(content.Text);
-            }
-        }
-
-        return sb.ToString();
     }
 
-    /// <summary>
-    /// Request body for the Responses API.
-    /// </summary>
+    private static ChatMessageRole MapRoleBack(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return ChatMessageRole.Assistant;
+        }
+
+        return role switch
+        {
+            "system" => ChatMessageRole.System,
+            "user" => ChatMessageRole.User,
+            "assistant" => ChatMessageRole.Assistant,
+            "tool" => ChatMessageRole.Tool,
+            _ => ChatMessageRole.Assistant,
+        };
+    }
+
     private sealed class ResponsesCreateRequestDto
     {
-        /// <summary>
-        /// Gets or sets the model identifier to use.
-        /// </summary>
-        [JsonPropertyName("model")]
         public string Model { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the input sequence for the model. For chat-like use cases this
-        /// is typically an array of message items.
+        /// Gets or sets the input sequence for the Responses API. For chat-style use cases
+        /// this is typically an array of message items.
         /// </summary>
-        [JsonPropertyName("input")]
         public List<ResponsesInputItemDto> Input { get; set; } = [];
 
-        /// <summary>
-        /// Gets or sets the optional maximum number of tokens in the model's output.
-        /// </summary>
         [JsonPropertyName("max_output_tokens")]
         public int? MaxOutputTokens { get; set; }
 
-        /// <summary>
-        /// Gets or sets the optional temperature controlling response variability.
-        /// </summary>
-        [JsonPropertyName("temperature")]
         public double? Temperature { get; set; }
+
+        /// <summary>
+        /// Gets or sets optional tool definitions to be sent to the Responses API.
+        /// </summary>
+        public List<ResponsesToolDefinitionDto>? Tools { get; set; }
     }
 
-    /// <summary>
-    /// Input item for the Responses API. Here we model only "message" items.
-    /// </summary>
     private sealed class ResponsesInputItemDto
     {
-        /// <summary>
-        /// Gets or sets the item type. For chat-style messages this should be "message".
-        /// </summary>
-        [JsonPropertyName("type")]
         public string Type { get; set; } = "message";
 
-        /// <summary>
-        /// Gets or sets the role for this message (system, user, assistant, tool).
-        /// </summary>
-        [JsonPropertyName("role")]
         public string Role { get; set; } = "user";
 
-        /// <summary>
-        /// Gets or sets the textual content of the message.
-        /// </summary>
-        [JsonPropertyName("content")]
-        public string Content { get; set; } = string.Empty;
+        public string? Content { get; set; }
     }
 
-    /// <summary>
-    /// Response body from the Responses API.
-    /// </summary>
+    private sealed class ResponsesToolDefinitionDto
+    {
+        public string Type { get; set; } = "function";
+
+        public ResponsesToolFunctionDto Function { get; set; } =
+            new ResponsesToolFunctionDto();
+    }
+
+    private sealed class ResponsesToolFunctionDto
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public object Parameters { get; set; } = new { };
+    }
+
     private sealed class ResponsesCreateResponseDto
     {
-        [JsonPropertyName("id")]
-        public string Id { get; set; } = string.Empty;
-
-        [JsonPropertyName("model")]
-        public string Model { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the sequence of output items returned by the model.
-        /// For chat-like use cases, this will be an array of "message" objects.
-        /// </summary>
-        [JsonPropertyName("output")]
-        public List<ResponsesOutputMessageDto> Output { get; set; } = [];
+        public List<ResponsesOutputMessageDto>? Output { get; set; }
     }
 
-    /// <summary>
-    /// A single output message from the Responses API output array.
-    /// </summary>
     private sealed class ResponsesOutputMessageDto
     {
-        [JsonPropertyName("id")]
-        public string Id { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the "message" for chat-style output.
-        /// </summary>
-        [JsonPropertyName("type")]
-        public string Type { get; set; } = string.Empty;
-
-        [JsonPropertyName("status")]
-        public string? Status { get; set; }
-
-        /// <summary>
-        /// Gets or sets the role of the message author, e.g. "assistant".
-        /// </summary>
-        [JsonPropertyName("role")]
         public string Role { get; set; } = "assistant";
 
         /// <summary>
-        /// Gets or sets the content items within this message (e.g., output_text).
+        /// Gets or sets the content segments of the output message.
+        /// For simplicity we assume the output is text; if your schema supports
+        /// structured output segments, extend this DTO accordingly.
         /// </summary>
-        [JsonPropertyName("content")]
-        public List<ResponsesContentItemDto> Content { get; set; } = [];
+        public List<ResponsesTextSegmentDto>? Content { get; set; }
+
+        public string GetCombinedText()
+        {
+            if (Content == null || Content.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder builder = new ();
+
+            for (int i = 0; i < Content.Count; i++)
+            {
+                ResponsesTextSegmentDto segment = Content[i];
+                builder.Append(segment.Text);
+            }
+
+            return builder.ToString();
+        }
     }
 
-    /// <summary>
-    /// A single content item inside an output message.
-    /// For simple text output, type == "output_text" and Text contains the joke.
-    /// </summary>
-    private sealed class ResponsesContentItemDto
+    private sealed class ResponsesTextSegmentDto
     {
-        [JsonPropertyName("type")]
-        public string Type { get; set; } = string.Empty;
+        public string Type { get; set; } = "output_text";
 
-        [JsonPropertyName("text")]
-        public string? Text { get; set; }
-
-        // The API also returns annotations and logprobs; we ignore them for now.
-    }
-
-    /// <summary>
-    /// A single output item from the Responses API.
-    /// </summary>
-    private sealed class ResponsesOutputItemDto
-    {
-        [JsonPropertyName("type")]
-        public string Type { get; set; } = string.Empty;
-
-        [JsonPropertyName("output_text")]
-        public ResponsesOutputTextDto? OutputText { get; set; }
-    }
-
-    /// <summary>
-    /// The text payload of an output item when type == "output_text".
-    /// </summary>
-    private sealed class ResponsesOutputTextDto
-    {
-        [JsonPropertyName("role")]
-        public string Role { get; set; } = "assistant";
-
-        [JsonPropertyName("content")]
-        public string? Content { get; set; }
+        public string Text { get; set; } = string.Empty;
     }
 }

@@ -1,6 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics.CodeAnalysis;
 using Genova.Common.Attributes;
 using Genova.Conduit.Agents;
 using Genova.Conduit.Chats;
@@ -20,6 +21,10 @@ namespace Genova.Conduit.Terminal.Agents;
 /// 3. Waits for human approval, implemented by waiting for a file at
 ///    C:\Temp\Approval.txt to exist, using a tool and an approval step.
 /// </summary>
+[SuppressMessage(
+    "Performance",
+    "CA1859:Use concrete types when possible for improved performance",
+    Justification = "Using interfaces expected by artificial intelligence code generation.")]
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public sealed class MathAgent : IAgent
 {

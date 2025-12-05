@@ -2,6 +2,7 @@
 // See the LICENSE file in the project root for more information.
 
 using Genova.Common.Attributes;
+using Genova.Conduit.Tools;
 
 namespace Genova.Conduit.Chats;
 
@@ -30,4 +31,11 @@ public sealed class ChatRequest
     /// Gets or sets an optional temperature value controlling response variability.
     /// </summary>
     public double? Temperature { get; set; }
+
+    /// <summary>
+    /// Gets or sets the collection of tool definitions that the model may
+    /// call as part of this request. These definitions are sent to the API
+    /// separately from the conversational messages.
+    /// </summary>
+    public IList<ToolDefinition> Tools { get; set; } = [];
 }

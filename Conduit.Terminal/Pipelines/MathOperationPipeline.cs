@@ -1,6 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics.CodeAnalysis;
 using Genova.Common.Attributes;
 using Genova.Conduit.Chats;
 using Genova.Conduit.Pipelines;
@@ -16,6 +17,10 @@ namespace Genova.Conduit.Terminal.Pipelines;
 /// uses an LLM to select an operation and operands, then invokes the
 /// corresponding math tool and stores the numeric result in the context.
 /// </summary>
+[SuppressMessage(
+    "Performance",
+    "CA1859:Use concrete types when possible for improved performance",
+    Justification = "Using interfaces expected by artificial intelligence code generation.")]
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public sealed class MathOperationPipeline : IPipeline
 {

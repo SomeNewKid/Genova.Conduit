@@ -1,6 +1,7 @@
 ﻿// This file is part of the Genova project licensed under the GNU General Public License v3.0.
 // See the LICENSE file in the project root for more information.
 
+using System.Diagnostics.CodeAnalysis;
 using Genova.Common.Attributes;
 using Genova.Conduit.Chats;
 using Genova.Conduit.Pipelines;
@@ -13,6 +14,10 @@ namespace Genova.Conduit.Terminal.Pipelines;
 /// using the LLM, based on the original question and numeric result
 /// stored in the <see cref="PipelineContext"/>.
 /// </summary>
+[SuppressMessage(
+    "Performance",
+    "CA1859:Use concrete types when possible for improved performance",
+    Justification = "Using interfaces expected by artificial intelligence code generation.")]
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public sealed class MathAnswerPipeline : IPipeline
 {
