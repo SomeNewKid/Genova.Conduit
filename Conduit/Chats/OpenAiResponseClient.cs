@@ -116,8 +116,6 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
 
         string json = JsonSerializer.Serialize(payload, _jsonOptions);
 
-        File.WriteAllText(@"C:\temp\debug4.txt", json);
-
         using StringContent content =
             new StringContent(json, Encoding.UTF8, "application/json");
 
