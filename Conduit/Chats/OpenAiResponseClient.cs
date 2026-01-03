@@ -18,12 +18,11 @@ namespace Genova.Conduit.Chats;
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public sealed class OpenAiResponseClient : IChatClient, IDisposable
 {
+    private const string ResponsesEndpoint = "responses";
     private readonly HttpClient _httpClient;
     private readonly string _defaultModel;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
-
-    private const string ResponsesEndpoint = "responses";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenAiResponseClient"/> class.
@@ -79,7 +78,7 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
         JsonSerializerOptions options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
         _jsonOptions = options;
@@ -111,7 +110,7 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
             Input = MapInputItems(request.Messages),
             MaxOutputTokens = request.MaxTokens,
             Temperature = request.Temperature,
-            Tools = MapTools(request.Tools)
+            Tools = MapTools(request.Tools),
         };
 
         string json = JsonSerializer.Serialize(payload, _jsonOptions);
@@ -137,7 +136,7 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
             return new ChatResponse
             {
                 Message = null,
-                ProviderMetadata = dto
+                ProviderMetadata = dto,
             };
         }
 
@@ -148,7 +147,7 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
         return new ChatResponse
         {
             Message = assistantMessage,
-            ProviderMetadata = dto
+            ProviderMetadata = dto,
         };
     }
 
@@ -166,16 +165,213 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
         _httpClient.Dispose();
     }
 
-    #region DTOs and mapping helpers
+    private static List<ResponsesToolDefinitionDto>? MapTools(IList<ToolDefinition> tools)
+    {
+        if (tools == null || tools.Count == 0)
+        {
+            return null;
+        }
+
+        List<ResponsesToolDefinitionDto> list = new List<ResponsesToolDefinitionDto>(tools.Count);
+
+        for (int i = 0; i < tools.Count; i++)
+        {
+            ToolDefinition tool = tools[i];
+
+            if (string.IsNullOrWhiteSpace(tool.Name))
+            {
+                continue;
+            }
+
+            object parameters;
+
+            try
+            {
+                parameters = JsonSerializer.Deserialize<object>(
+                                 tool.ParametersJsonSchema,
+                                 new JsonSerializerOptions
+                                 {
+                                     PropertyNameCaseInsensitive = true,
+                                 }) ?? new { };
+            }
+            catch
+            {
+                parameters = new { };
+            }
+
+            ResponsesToolDefinitionDto dto = new ResponsesToolDefinitionDto
+            {
+                Type = "function",
+                Name = tool.Name,
+                Description = tool.Description,
+                Parameters = parameters,
+            };
+
+            list.Add(dto);
+        }
+
+        return list.Count == 0 ? null : list;
+    }
+
+    private static string MapRole(ChatMessageRole role)
+    {
+        switch (role)
+        {
+            case ChatMessageRole.System:
+                return "system";
+            case ChatMessageRole.User:
+                return "user";
+            case ChatMessageRole.Assistant:
+                return "assistant";
+            case ChatMessageRole.Tool:
+                return "tool";
+            default:
+                return "user";
+        }
+    }
+
+    private static ChatMessageRole MapRoleBack(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return ChatMessageRole.Assistant;
+        }
+
+        switch (role)
+        {
+            case "system":
+                return ChatMessageRole.System;
+            case "user":
+                return ChatMessageRole.User;
+            case "assistant":
+                return ChatMessageRole.Assistant;
+            case "tool":
+                return ChatMessageRole.Tool;
+            default:
+                return ChatMessageRole.Assistant;
+        }
+    }
+
+    private List<ResponsesInputItemDto> MapInputItems(IList<ChatMessage> messages)
+    {
+        List<ResponsesInputItemDto> list = new List<ResponsesInputItemDto>(messages.Count);
+
+        for (int i = 0; i < messages.Count; i++)
+        {
+            ChatMessage message = messages[i];
+
+            ResponsesInputItemDto item = new ResponsesInputItemDto
+            {
+                Type = "message",
+                Role = MapRole(message.Role),
+                Content = message.Content,
+            };
+
+            list.Add(item);
+        }
+
+        return list;
+    }
+
+    private ChatMessage? MapOutputToChatMessage(ResponsesOutputItemDto output)
+    {
+        if (string.Equals(output.Type, "function_call", StringComparison.OrdinalIgnoreCase))
+        {
+            // Tool call output: synthesize a payload that higher-level code can
+            // interpret as a tool request, e.g. { "tool": "dot-notation", "keys": "..." }.
+            string toolName = output.Name ?? string.Empty;
+            string? keys = ExtractKeysFromArguments(output.Arguments);
+
+            ToolRequestPayload payload = new ToolRequestPayload
+            {
+                Tool = toolName,
+                Keys = keys,
+            };
+
+            string contentJson = JsonSerializer.Serialize(payload, _jsonOptions);
+
+            ChatMessage toolMessage = new ChatMessage
+            {
+                Role = ChatMessageRole.Assistant,
+                Content = contentJson,
+            };
+
+            return toolMessage;
+        }
+
+        // Normal message output: combine text segments.
+        string text = output.GetCombinedText();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        ChatMessageRole role = MapRoleBack(output.Role);
+
+        ChatMessage assistantMessage = new ChatMessage
+        {
+            Role = role,
+            Content = text,
+        };
+
+        return assistantMessage;
+    }
+
+    private string? ExtractKeysFromArguments(string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(argumentsJson);
+            JsonElement root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("keys", out JsonElement keysElement))
+            {
+                if (keysElement.ValueKind == JsonValueKind.String)
+                {
+                    return keysElement.GetString();
+                }
+
+                if (keysElement.ValueKind == JsonValueKind.Array)
+                {
+                    List<string> parts = new List<string>();
+
+                    foreach (JsonElement child in keysElement.EnumerateArray())
+                    {
+                        if (child.ValueKind == JsonValueKind.String)
+                        {
+                            string? value = child.GetString();
+                            if (!string.IsNullOrWhiteSpace(value))
+                            {
+                                parts.Add(value);
+                            }
+                        }
+                    }
+
+                    if (parts.Count > 0)
+                    {
+                        return string.Join(", ", parts);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If parsing fails, fall through and return null.
+        }
+
+        return null;
+    }
 
     private sealed class ResponsesCreateRequestDto
     {
         public string Model { get; set; } = string.Empty;
 
-        /// <summary>
-        /// The input sequence for the Responses API. For chat-style use cases
-        /// this is typically an array of message items.
-        /// </summary>
         public List<ResponsesInputItemDto> Input { get; set; } =
             new List<ResponsesInputItemDto>();
 
@@ -184,9 +380,6 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
 
         public double? Temperature { get; set; }
 
-        /// <summary>
-        /// Optional tool definitions to be sent to the Responses API.
-        /// </summary>
         public List<ResponsesToolDefinitionDto>? Tools { get; set; }
     }
 
@@ -271,210 +464,4 @@ public sealed class OpenAiResponseClient : IChatClient, IDisposable
         [JsonPropertyName("keys")]
         public string? Keys { get; set; }
     }
-
-    private List<ResponsesInputItemDto> MapInputItems(IList<ChatMessage> messages)
-    {
-        List<ResponsesInputItemDto> list = new List<ResponsesInputItemDto>(messages.Count);
-
-        for (int i = 0; i < messages.Count; i++)
-        {
-            ChatMessage message = messages[i];
-
-            ResponsesInputItemDto item = new ResponsesInputItemDto
-            {
-                Type = "message",
-                Role = MapRole(message.Role),
-                Content = message.Content
-            };
-
-            list.Add(item);
-        }
-
-        return list;
-    }
-
-    private static List<ResponsesToolDefinitionDto>? MapTools(IList<ToolDefinition> tools)
-    {
-        if (tools == null || tools.Count == 0)
-        {
-            return null;
-        }
-
-        List<ResponsesToolDefinitionDto> list = new List<ResponsesToolDefinitionDto>(tools.Count);
-
-        for (int i = 0; i < tools.Count; i++)
-        {
-            ToolDefinition tool = tools[i];
-
-            if (string.IsNullOrWhiteSpace(tool.Name))
-            {
-                continue;
-            }
-
-            object parameters;
-
-            try
-            {
-                parameters = JsonSerializer.Deserialize<object>(
-                                 tool.ParametersJsonSchema,
-                                 new JsonSerializerOptions
-                                 {
-                                     PropertyNameCaseInsensitive = true
-                                 }) ?? new { };
-            }
-            catch
-            {
-                parameters = new { };
-            }
-
-            ResponsesToolDefinitionDto dto = new ResponsesToolDefinitionDto
-            {
-                Type = "function",
-                Name = tool.Name,
-                Description = tool.Description,
-                Parameters = parameters
-            };
-
-            list.Add(dto);
-        }
-
-        return list.Count == 0 ? null : list;
-    }
-
-    private ChatMessage? MapOutputToChatMessage(ResponsesOutputItemDto output)
-    {
-        if (string.Equals(output.Type, "function_call", StringComparison.OrdinalIgnoreCase))
-        {
-            // Tool call output: synthesize a payload that higher-level code can
-            // interpret as a tool request, e.g. { "tool": "dot-notation", "keys": "..." }.
-
-            string toolName = output.Name ?? string.Empty;
-            string? keys = ExtractKeysFromArguments(output.Arguments);
-
-            ToolRequestPayload payload = new ToolRequestPayload
-            {
-                Tool = toolName,
-                Keys = keys
-            };
-
-            string contentJson = JsonSerializer.Serialize(payload, _jsonOptions);
-
-            ChatMessage toolMessage = new ChatMessage
-            {
-                Role = ChatMessageRole.Assistant,
-                Content = contentJson
-            };
-
-            return toolMessage;
-        }
-
-        // Normal message output: combine text segments.
-        string text = output.GetCombinedText();
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
-        ChatMessageRole role = MapRoleBack(output.Role);
-
-        ChatMessage assistantMessage = new ChatMessage
-        {
-            Role = role,
-            Content = text
-        };
-
-        return assistantMessage;
-    }
-
-    private string? ExtractKeysFromArguments(string? argumentsJson)
-    {
-        if (string.IsNullOrWhiteSpace(argumentsJson))
-        {
-            return null;
-        }
-
-        try
-        {
-            using JsonDocument doc = JsonDocument.Parse(argumentsJson);
-            JsonElement root = doc.RootElement;
-
-            if (root.ValueKind == JsonValueKind.Object &&
-                root.TryGetProperty("keys", out JsonElement keysElement))
-            {
-                if (keysElement.ValueKind == JsonValueKind.String)
-                {
-                    return keysElement.GetString();
-                }
-
-                if (keysElement.ValueKind == JsonValueKind.Array)
-                {
-                    List<string> parts = new List<string>();
-
-                    foreach (JsonElement child in keysElement.EnumerateArray())
-                    {
-                        if (child.ValueKind == JsonValueKind.String)
-                        {
-                            string? value = child.GetString();
-                            if (!string.IsNullOrWhiteSpace(value))
-                            {
-                                parts.Add(value);
-                            }
-                        }
-                    }
-
-                    if (parts.Count > 0)
-                    {
-                        return string.Join(", ", parts);
-                    }
-                }
-            }
-        }
-        catch
-        {
-            // If parsing fails, fall through and return null.
-        }
-
-        return null;
-    }
-
-    private static string MapRole(ChatMessageRole role)
-    {
-        switch (role)
-        {
-            case ChatMessageRole.System:
-                return "system";
-            case ChatMessageRole.User:
-                return "user";
-            case ChatMessageRole.Assistant:
-                return "assistant";
-            case ChatMessageRole.Tool:
-                return "tool";
-            default:
-                return "user";
-        }
-    }
-
-    private static ChatMessageRole MapRoleBack(string? role)
-    {
-        if (string.IsNullOrWhiteSpace(role))
-        {
-            return ChatMessageRole.Assistant;
-        }
-
-        switch (role)
-        {
-            case "system":
-                return ChatMessageRole.System;
-            case "user":
-                return ChatMessageRole.User;
-            case "assistant":
-                return ChatMessageRole.Assistant;
-            case "tool":
-                return ChatMessageRole.Tool;
-            default:
-                return ChatMessageRole.Assistant;
-        }
-    }
-
-    #endregion
 }
