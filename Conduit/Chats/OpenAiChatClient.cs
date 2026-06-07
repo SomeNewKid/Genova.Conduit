@@ -149,7 +149,7 @@ public sealed class OpenAiChatClient : IChatClient, IDisposable
             ChatMessageRole.User => "user",
             ChatMessageRole.Assistant => "assistant",
             ChatMessageRole.Tool => "tool",
-            _ => "user"
+            _ => "user",
         };
 
     private static ChatMessageRole MapRoleBack(string? role) =>
@@ -159,7 +159,7 @@ public sealed class OpenAiChatClient : IChatClient, IDisposable
             "assistant" => ChatMessageRole.Assistant,
             "tool" => ChatMessageRole.Tool,
             "user" => ChatMessageRole.User,
-            _ => ChatMessageRole.Assistant
+            _ => ChatMessageRole.Assistant,
         };
 
     private sealed class ChatCompletionRequestDto
