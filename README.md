@@ -2,6 +2,12 @@
 
 Genova.Conduit is a lightweight C# framework for building **local-first, agent-driven applications** that combine:
 
+> [!WARNING]
+> This codebase is part of the Genova platform and should not be considered production-ready. It is published as source for review, experimentation, and reuse within Genova-related projects.
+
+> [!IMPORTANT]
+> A fresh public clone of this repository should not be expected to restore or build without additional Genova infrastructure. Many Genova dependencies are distributed through a private authenticated NuGet feed, and the public source does not include feed credentials or a complete public package graph.
+
 * LLM-based cognition (via OpenAI or other providers)
 * Local orchestrated workflows
 * Reusable short-lived pipelines and steps
@@ -123,11 +129,10 @@ In Genova.Conduit:
 
 This layered model allows developers to build intelligent, flexible systems that combine **LLM cognition** with **local execution**, while keeping responsibilities focused and components reusable.
 
----
+## Third-Party Notices
 
-If you’d like, I can now:
+This project has direct runtime dependencies on third-party NuGet packages, including `Microsoft.Extensions.*` packages (MIT), `Microsoft.ML*` packages (MIT). See each package's NuGet license metadata for full license and notice terms.
 
-* Produce a **diagram** of these relationships,
-* Add a section on **data flow**,
-* Provide example usage patterns,
-* Or generate a more complete repository-level `README.md` with installation instructions, examples, and philosophy.
+## License
+
+GNU General Public License v3.0. See the `LICENSE` file for details.

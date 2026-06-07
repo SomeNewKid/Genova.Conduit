@@ -9,13 +9,12 @@ namespace Genova.Conduit.Terminal.Steps;
 
 /// <summary>
 /// Represents a pipeline step that checks for human approval by verifying
-/// the existence of a file at a fixed path (C:\Temp\Approval.txt). The
+/// the existence of a configured file path. The
 /// result is written into the pipeline context as a boolean value.
 /// </summary>
 [CodeQuality(Public = true, Justification = "Intended for use by libraries and applications.")]
 public sealed class MathApprovalStep : IPipelineStep
 {
-    private const string ApprovalFilePath = @"C:\Temp\Approval.txt";
     private const string FileExistsToolName = "fileExists";
 
     private readonly IToolRegistry _toolRegistry;
@@ -31,6 +30,9 @@ public sealed class MathApprovalStep : IPipelineStep
     /// The key in <see cref="PipelineContext.Items"/> under which the boolean
     /// approval result will be stored.
     /// </param>
+    /// <param name="approvalFilePath">
+    /// The path of the file whose presence grants approval.
+    /// </param>
     /// <exception cref="ArgumentNullException">
     /// Thrown when <paramref name="toolRegistry"/> is <c>null</c>.
     /// </exception>
@@ -39,7 +41,8 @@ public sealed class MathApprovalStep : IPipelineStep
     /// </exception>
     public MathApprovalStep(
         IToolRegistry toolRegistry,
-        string approvalResultKey)
+        string approvalResultKey,
+        string? approvalFilePath = null)
     {
         ArgumentNullException.ThrowIfNull(toolRegistry);
 
@@ -50,11 +53,17 @@ public sealed class MathApprovalStep : IPipelineStep
 
         _toolRegistry = toolRegistry;
         _approvalResultKey = approvalResultKey;
+        ApprovalFilePath = Path.GetFullPath(approvalFilePath ?? Path.Combine(AppContext.BaseDirectory, "Approval.txt"));
     }
 
     /// <summary>
+    /// Gets the path of the file whose presence grants approval.
+    /// </summary>
+    public string ApprovalFilePath { get; }
+
+    /// <summary>
     /// Executes the step by invoking the file-existence tool to check
-    /// for C:\Temp\Approval.txt and writing the boolean result into
+    /// the configured approval file and writing the boolean result into
     /// the pipeline context.
     /// </summary>
     /// <param name="context">The shared pipeline context.</param>

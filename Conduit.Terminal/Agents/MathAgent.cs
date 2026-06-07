@@ -18,8 +18,8 @@ namespace Genova.Conduit.Terminal.Agents;
 ///    operation and operands, and invoke the corresponding math tool.
 /// 2. Iteratively increments from 0 until it reaches the computed result,
 ///    delegating the increment workload to a tool.
-/// 3. Waits for human approval, implemented by waiting for a file at
-///    C:\Temp\Approval.txt to exist, using a tool and an approval step.
+/// 3. Waits for human approval, implemented by waiting for an approval
+///    file to exist, using a tool and an approval step.
 /// </summary>
 [SuppressMessage(
     "Performance",
@@ -53,7 +53,7 @@ public sealed class MathAgent : IAgent
 
     private readonly IPipeline _mathPipeline;
     private readonly IToolRegistry _toolRegistry;
-    private readonly IPipelineStep _approvalStep;
+    private readonly MathApprovalStep _approvalStep;
     private readonly IPipeline _finalAnswerPipeline;
 
     /// <summary>
@@ -348,7 +348,7 @@ public sealed class MathAgent : IAgent
             return new AgentRunResult
             {
                 Status = AgentRunStatus.PendingExternalEvents,
-                Message = $"Awaiting approval: create C:\\Temp\\Approval.txt to approve the result."
+                Message = $"Awaiting approval: create {_approvalStep.ApprovalFilePath} to approve the result."
             };
         }
 
